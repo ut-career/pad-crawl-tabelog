@@ -13,7 +13,7 @@ IF TargetURLInputButtonPressed = $'''OK''' THEN
         LOOP StoreLoopIndex FROM 0 TO StoreLinks.RowsCount - 1 STEP 1
             WebAutomation.GoToWebPageNoWait BrowserInstance: StoreBrowser Url: StoreLinks[StoreLoopIndex]
             # 店舗情報をテーブルで取得して、Key列のテキストを用いて内容の判定を行い、必要なデータを抽出する
-            WebAutomation.DataExtraction.ExtractTable BrowserInstance: StoreBrowser Control: $'''#rst-data-head > table.c-table.rstinfo-table__table:eq(0) > tbody > tr''' ExtractionParameters: {[$'''th''', $'''Own Text''', $'''''', $'''Key'''], [$'''td''', $'''Own Text''', $'''''', $'''Value'''] } ExtractedData=> StoreDetailList
+            WebAutomation.DataExtraction.ExtractTable BrowserInstance: StoreBrowser Control: $'''#rst-data-head   tr''' ExtractionParameters: {[$'''th''', $'''Own Text''', $'''''', $'''Key'''], [$'''td''', $'''Own Text''', $'''''', $'''Value'''] } ExtractedData=> StoreDetailList
             SET StoreDetailOutputCustomObject TO { 'Name': '', 'Genre': '', 'Contact': '', 'Address': '' }
             LOOP FOREACH StoreDetailItem IN StoreDetailList
                 SWITCH StoreDetailItem[0]
@@ -22,6 +22,10 @@ IF TargetURLInputButtonPressed = $'''OK''' THEN
                     CASE = $'''ジャンル'''
                         SET StoreDetailOutputCustomObject['Jenre'] TO StoreDetailItem[1]
                     CASE Contains($'''お問い合わせ''', False)
+                        IF IsNotEmpty($'''%StoreDetailOutputCustomObject%[\'Contact\']''') THEN
+                            SET StoreDetailOutputCustomObject['Contact'] TO StoreDetailItem[1]
+                        END
+                    CASE = $'''電話番号'''
                         SET StoreDetailOutputCustomObject['Contact'] TO StoreDetailItem[1]
                     CASE = $'''住所'''
                         SET StoreDetailOutputCustomObject['Address'] TO StoreDetailItem[1]
