@@ -1,26 +1,26 @@
 Display.InputDialog Title: $'''クローリングの開始''' Message: $'''URLを入力''' InputType: Display.InputType.SingleLine IsTopMost: False UserInput=> TargetURL ButtonPressed=> TargetURLInputButtonPressed
 IF TargetURLInputButtonPressed = $'''OK''' THEN
-    DateTime.Local DateTimeFormat: DateTime.DateTimeFormat.DateAndTime CurrentDateTime=> BeginDateTime
-    Excel.Launch Visible: True LoadAddInsAndMacros: False Instance=> ExcelInstance
-    Excel.WriteCell Instance: ExcelInstance Value: {['店名', 'ジャンル', '電話番号', '住所', 'url'] } Column: 1 Row: 1
-    WebAutomation.LaunchChromeNoWait Url: TargetURL WindowState: WebAutomation.BrowserWindowState.Minimized ClearCache: False ClearCookies: False Timeout: 60 BrowserInstance=> Browser
-    WebAutomation.CreateNewTabNoWait BrowserInstance: Browser Url: TargetURL NewBrowserInstance=> StoreBrowser
+    DateTime.GetCurrentDateTime.Local DateTimeFormat: DateTime.DateTimeFormat.DateAndTime CurrentDateTime=> BeginDateTime
+    Excel.LaunchExcel.Launch Visible: True LoadAddInsAndMacros: False Instance=> ExcelInstance
+    Excel.WriteToExcel.WriteCell Instance: ExcelInstance Value: {['店名', 'ジャンル', '電話番号', '住所', 'url'] } Column: 1 Row: 1
+    WebAutomation.LaunchChrome.LaunchChromeNoWait Url: TargetURL WindowState: WebAutomation.BrowserWindowState.Minimized ClearCache: False ClearCookies: False Timeout: 60 BrowserInstance=> Browser
+    WebAutomation.CreateNewTab.CreateNewTabNoWait BrowserInstance: Browser Url: TargetURL NewBrowserInstance=> StoreBrowser
     # 次のページに遷移できなくなるまでループ
     SET PageLoopIndex TO 0
     LOOP WHILE (0) <= (PageLoopIndex)
         # ページ内の店舗ごとにループ
-        WebAutomation.DataExtraction.ExtractList BrowserInstance: Browser Control: $'''h3 > .list-rst__rst-name-target''' ExtractionParameters: {[$'''''', $'''Href''', $''''''] } ExtractedData=> StoreLinks
+        WebAutomation.ExtractData.ExtractList BrowserInstance: Browser Control: $'''h3 > .list-rst__rst-name-target''' ExtractionParameters: {[$'''''', $'''Href''', $''''''] } ExtractedData=> StoreLinks
         LOOP StoreLoopIndex FROM 0 TO StoreLinks.RowsCount - 1 STEP 1
-            WebAutomation.GoToWebPageNoWait BrowserInstance: StoreBrowser Url: StoreLinks[StoreLoopIndex]
+            WebAutomation.GoToWebPage.GoToWebPageCloseDialog BrowserInstance: StoreBrowser Url: StoreLinks[StoreLoopIndex]
             # 店舗情報をテーブルで取得して、Key列のテキストを用いて内容の判定を行い、必要なデータを抽出する
-            WebAutomation.DataExtraction.ExtractTable BrowserInstance: StoreBrowser Control: $'''#rst-data-head   tr''' ExtractionParameters: {[$'''th''', $'''Own Text''', $'''''', $'''Key'''], [$'''td''', $'''Own Text''', $'''''', $'''Value'''] } ExtractedData=> StoreDetailList
+            WebAutomation.ExtractData.ExtractTable BrowserInstance: StoreBrowser Control: $'''#rst-data-head   tr''' ExtractionParameters: {[$'''th''', $'''Own Text''', $'''''', $'''Key'''], [$'''td''', $'''Own Text''', $'''''', $'''Value'''] } ExtractedData=> StoreDetailList
             SET StoreDetailOutputCustomObject TO { 'Name': '', 'Genre': '', 'Contact': '', 'Address': '' }
             LOOP FOREACH StoreDetailItem IN StoreDetailList
                 SWITCH StoreDetailItem[0]
                     CASE = $'''店名'''
                         SET StoreDetailOutputCustomObject['Name'] TO StoreDetailItem[1]
                     CASE = $'''ジャンル'''
-                        SET StoreDetailOutputCustomObject['Jenre'] TO StoreDetailItem[1]
+                        SET StoreDetailOutputCustomObject['Genre'] TO StoreDetailItem[1]
                     CASE Contains($'''お問い合わせ''', False)
                         IF IsNotEmpty($'''%StoreDetailOutputCustomObject%[\'Contact\']''') THEN
                             SET StoreDetailOutputCustomObject['Contact'] TO StoreDetailItem[1]
@@ -31,23 +31,23 @@ IF TargetURLInputButtonPressed = $'''OK''' THEN
                         SET StoreDetailOutputCustomObject['Address'] TO StoreDetailItem[1]
                 END
             END
-            Text.Split Text: StoreDetailOutputCustomObject['Address'] StandardDelimiter: Text.StandardDelimiter.NewLine DelimiterTimes: 1 Result=> StoreAddressTextList
-            Excel.WriteCell Instance: ExcelInstance Value: {[StoreDetailOutputCustomObject['Name'], StoreDetailOutputCustomObject['Jenre'], StoreDetailOutputCustomObject['Contact'], StoreAddressTextList[0], StoreLinks[StoreLoopIndex][0]] } Column: 1 Row: PageLoopIndex * 20 + StoreLoopIndex + 2
+            Text.SplitText.Split Text: StoreDetailOutputCustomObject['Address'] StandardDelimiter: Text.StandardDelimiter.NewLine DelimiterTimes: 1 Result=> StoreAddressTextList
+            Excel.WriteToExcel.WriteCell Instance: ExcelInstance Value: {[StoreDetailOutputCustomObject['Name'], StoreDetailOutputCustomObject['Genre'], StoreDetailOutputCustomObject['Contact'], StoreAddressTextList[0], StoreLinks[StoreLoopIndex][0]] } Column: 1 Row: PageLoopIndex * 20 + StoreLoopIndex + 2
         END
-        WebAutomation.DataExtraction.ExtractSingleValue BrowserInstance: Browser ExtractionParameters: {[$'''a.c-pagination__arrow--next[rel=\"next\"]''', $'''Href''', $''''''] } ExtractedData=> NextPageLink
+        WebAutomation.ExtractData.ExtractSingleValue BrowserInstance: Browser ExtractionParameters: {[$'''a.c-pagination__arrow--next[rel=\"next\"]''', $'''Href''', $''''''] } ExtractedData=> NextPageLink
                 ON ERROR ExtractDataError
                     GOTO PostPageLoop
                 END
-        WebAutomation.GoToWebPageCloseDialog BrowserInstance: Browser Url: NextPageLink[0][0]
+        WebAutomation.GoToWebPage.GoToWebPageCloseDialog BrowserInstance: Browser Url: NextPageLink[0][0]
         Variables.IncreaseVariable Value: PageLoopIndex IncrementValue: 1 IncreasedValue=> PageLoopIndex
     END
     LABEL PostPageLoop
     WebAutomation.CloseWebBrowser BrowserInstance: StoreBrowser
     WebAutomation.CloseWebBrowser BrowserInstance: Browser
-    DateTime.Local DateTimeFormat: DateTime.DateTimeFormat.DateAndTime CurrentDateTime=> EndDateTime
+    DateTime.GetCurrentDateTime.Local DateTimeFormat: DateTime.DateTimeFormat.DateAndTime CurrentDateTime=> EndDateTime
     DateTime.Subtract FromDate: EndDateTime SubstractDate: BeginDateTime TimeUnit: DateTime.DifferenceTimeUnit.Seconds TimeDifference=> TimeDifference
-    Display.ShowMessage Title: $'''finish''' Message: $'''処理終了
+    Display.ShowMessageDialog.ShowMessage Title: $'''finish''' Message: $'''処理終了
 実行時間 %TimeDifference%秒''' Icon: Display.Icon.None Buttons: Display.Buttons.OK DefaultButton: Display.DefaultButton.Button1 IsTopMost: False
 ELSE
-    Display.ShowMessage Title: $'''End''' Message: $'''処理を終了しました''' Icon: Display.Icon.None Buttons: Display.Buttons.OK DefaultButton: Display.DefaultButton.Button1 IsTopMost: False
+    Display.ShowMessageDialog.ShowMessage Title: $'''End''' Message: $'''処理を終了しました''' Icon: Display.Icon.None Buttons: Display.Buttons.OK DefaultButton: Display.DefaultButton.Button1 IsTopMost: False
 END
